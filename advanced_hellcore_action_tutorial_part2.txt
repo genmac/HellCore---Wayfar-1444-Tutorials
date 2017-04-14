@@ -1,0 +1,92 @@
+The Advanced Hellcore $action tutorial, Part 2
+
+$action Pro Tips
+
+
+Extra utility verbs on $creatures and $players:
+* is_doing(OBJ action, [ ?OBJ callback ]) - this requires the first argument, and the second is optional.  It checks a player or creature to see if they are executing the action sent as the first argument.  If the callback argument is also present, that is checked against the player's executing action.  If the creature or player matches the criteria, is_doing returns 1, otherwise 0.
+
+Example:
+" pretend this is a sanity check in an eat command";
+if( player:is_doing($actions.mock_attack) )
+     player:tell("You can't eat right now, because you are attacking!");
+endif
+
+"and this one checks to see if the player is attacking with a sword";
+"$weapons.sword would be a valid weapon object, and we're assuming the first callback in $actions.mock_attack is the weapon being used.";
+if( player:is_doing($actions.mock_attack, $weapons.sword) )
+    player:tell("You use your sword to chop your food before eating it.  Oh boy!");
+endif
+
+Changing call back arguments in an $action
+Scenario: You want to loop through an action exactly 5 times.
+
+"you queue it like this";
+player:queue_action($actions.mock_loop, {1, 5});
+
+"in your _finish code you check the stage status and increment stage (in this examples, args[2][1])";
+who = args[1];
+stage = args[2][1];
+max_stage = args[2][2];
+
+if(stage < max_stage)
+  stage = stage + 1;
+  "keep looping, by returning an action object from _finish. _continue will be called on the action you return.";
+  "Usually you return the action you're executing!";
+  return {this, {stage, max_stage}};
+else
+  who:tell("Looping complete!");
+  "we can return E_NONE to finish the action, or fall through to more codes dealing with the specifics";
+  return E_NONE;
+endif
+
+Broadcasting events from within an $action
+
+Events and callbacks should be familiar topics for anyone who has done any event driven programming.  The idea is simple: code 'broadcasts' an 'event', and other code 'listens' and then reacts to the event.  You broadcast with this verb, which is defined on #1 or $room depending on your hellcore version:
+broadcast_event(INT is_start, OBJ action, OBJ who, LIST callbacks)
+
+is_start is 0 for a completing action, and 1 for a beginning action.  action is the action object (or really whatever object) being broadcast, who is the action executor, and callbacks is a list of the callbacks from the action (exactly the same as args[2] within the $action itself).
+
+Example:
+
+$actions.mock_walk
+"let's announce we're going to walk around - pretend this is in a _start verb";
+who = args[1];
+direction = args[2][1];
+"we broadcast a 'hey i'm going to be walking here' event";
+who.location:broadcast_event(1, this, who, {direction});
+
+"now pretend this is in _finish, we announce the completion of the move";
+who = args[1];
+direction = args[2][1];
+who.location:broadcast_event(0, this, who, {direction});
+
+These events can then be received by other objects in the same location as who from our example above.  The two main ways to receive these are:
+forbid_action_* - this should be specific to the action you want to forbid.  For our example, the verb would be named forbid_action_mock_walk.  If forbid_action returns 1, the action is halted and the actor cannot execute it.
+hear_event_* - For our example the verb would be hear_event_mock_walk.
+
+Example on a player or creature, to receive walking messages:
+
+hear_event_mock_walk
+{starting, action, who, callbacks} = args;
+direction = callbacks[1];
+" as you can see we receive the args just like they are sent to broadcast_event";
+if(!starting)
+  "if the walk is actually occuring, let's tell ourselves about it";
+  this:tell(who:name(), " walks off to the ", direction, ".");
+endif
+
+Calling an impromptu action from any object
+
+You have an object, lets call it MEDICAL TERMINAL.  You have a verb allowing the player to INVESTIGATE MEDICAL TERMINAL, and you want a short action (not require start, continue, finish, but you'd like the delay and action messaging).  Here's how you do that.
+
+@verb terminal:investigate
+player:queue_action($actions.verb, {this, "_search_terminal", {player}, 3.0, 1}, "searching the terminal for valuable information");
+
+@verb terminal:_search_terminal
+{is_start, object, actor, callbacks} = args;
+"object" will be equal to the medical terminal's object number
+actor will be equal to the player who queued the action
+and callbacks will be array containing the player who queued the action
+
+This will display the player as "searching the terminal for valuable information, and within this _search_terminal verb you can do whatever simple operations you like without having to write a full action.  It will take 3 seconds for the action to begin (specified by the 3.0).

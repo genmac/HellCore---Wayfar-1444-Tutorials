@@ -1,0 +1,43 @@
+LambdaMOO/Hellcore: Broadcasting to an IRC server
+
+On Wayfar, when a player is killed they get a death taunt in the style of the LORD or BBS door games.  When enough kills are accumulated the MOO connects to an IRC server, posts a kill update, and then disconnects.
+
+The commands to interact with an IRC server are straightforward:
+
+conn = open_network_connection(server, port);
+set_connection_option(conn, "hold-input", 1);
+
+Open the connection and tell the MOO not interpret anything on this connection as a game command.
+
+
+
+notify(conn, "USER YOUR_USR_NAME 8 *  : your_comment");
+botname = "Jerkturkey";
+notify(conn, "NICK " + botname);
+
+That sends the USER and NICK.  Now the IRC server will send a bunch of nonsense at you, then disconnect you if you don't answer the ping request in time.  So we wait for the first ping before we start sending messages:
+
+
+while (line = read(conn))
+      if (hurf = $su:explode(line))
+        if ($su:uppercase(hurf[1]) == "PING")
+          notify(conn, "PONG " + hurf[2]);
+          break;
+        endif
+      endif
+    endwhile
+
+Note that we have to reply with information from the request.  Next up, join a channel:
+
+notify(conn, "JOIN #wayfar1444");
+
+Send whatever messages we've arranged, preferably a batch of messages:
+
+for x in ($web.irc_queue)
+     notify(conn, "PRIVMSG #wayfar1444 :"+x);
+endfor
+
+Tell the IRC server we're leaving and disconnect:
+
+notify(conn, "QUIT");
+boot_player(conn);

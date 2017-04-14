@@ -1,0 +1,58 @@
+A short guide to implementing MXP on hellcore and notes concerning overall implementation
+
+Fixing $mxp on Hellcore
+
+Hellcore has a utility called $mxp. $mxp:activate is called on a player when that player changes his MXP pref to 1 (@prefs mxp is 1). In $mxp:activate, telnet negotiation codes are sent to the client indicating the server can send MXP. The $mxp implementation doesn't handle this correctly for Mushclient. In fact it doesn't really handle it correctly, at all, but we can fake it.
+$mxp:activate should look like this:
+
+
+  who = args[1];
+  this:tell(who, encode_binary(this.code_IAC, this.code_WILL, "[", 0));
+  this:tell(who, encode_binary(this.code_IAC, this.code_SB, "[", this.code_IAC,
+this.code_SE, 0));
+  this:tell(who, this.tag_lock_locked_mode);
+  this:define_elements(who);
+ who:tell("MXP mode activated!");
+The change to regular hellcore is the second tell, sending DO MXP or something. I also made modification to define_elements. First:
+@prop $mxp.elements {}
+
+$mxp:define_elements should look like this:
+
+
+  who = args[1];
+  this:tell_secure_line(who, $su:from_list(this.elements, ""));
+This allows you to define elements on $mxp.elements.  Here are some example elements formerly hardcoded into $mxp:define_elements:
+
+<!ELEMENT roomexit FLAG=RoomExit>
+
+<!ELEMENT roomnum FLAG=RoomNum>
+
+
+See the MXP spec for details on defining elements, attribute lists, etc. $mxp.elements is where you will store them so they are defined to the user when MXP is turned on.
+Notes on implementing MXP in game
+
+You must use $mxp:tell_secure_line (or $mxp:tell_lines_secure_line for multiple lines) to send text with MXP tags included.  This means you need to detect when MXP is on, figure out when you're going to be sending MXP, and then tell_secure_line instead of tell in appropriate places.
+
+Then you'll want to define the MXP to be sent for various things.  I did this by adding props to $thing for instance:
+.mxp_look_place_string - the MXP string to be sent when the item is seen in a room.
+.mxp_inventory_string - the MXP string to be sent when in inventory
+
+And on $creature:
+.mxp_tactical_string - the MXP string to be sent when the creature is listed in the tactical display.
+
+The main use of MXP is to add links or right click menus to in game content.
+Example $exit.mxp_look_place_string:
+"<send>east</send>"
+When clicked, the east link will send the text between and , which in this case is "east".
+
+Or, an example weapon mxp_inventory_string:
+ "<weapon><send href=\"x &text;|wield &text;|remove &text\">colonial rifle</send></weapon>"
+In this example we use a pre defined element to setup the link color, underlining, bolding etc, and then use the item's .mxp_inventory_string to define the right click menu.
+
+Examples of some of the changes I made to common functions:
+
+#1:do_examine - if mxp is on print .mxp_examine_menu if it is present and valid
+$room:list_obvious - 1) print an mxp_look_self_menu string if it exists and mxp is on, 2) if mxp is on, use secure lines to tell the description and objects to player, 3) if mxp is on and an mxp_hint_msg exists, print that string
+$room:mxp_list_exits (called from $room:list_exits) - to display mxp formatted exits
+$creature:tell - to send all text in "locked" mode, ignoring mxp tags - when mxp is displayed it must be sent via $mxp:tell_secure_line or $mxp:tell_lines_secure_line
+$thing:look_place_msg - I overrode this, adding an mxp_look_place_string property.  If mxp is on and the string is valid, it returns the string, otherwise passing the results of #1:look_place_msg

@@ -1,0 +1,75 @@
+Guide: Configuring Hellcore to route email through Gmail's SMTP servers
+
+After some testing I found out the Gmail configuration I had previously posted only worked to deliver email to gmail.com addresses. Kind of a major flaw. This took me quite some time to fix and should be useful for other applications, like using gmail to send email from a PHP script or C# program.
+
+The problem with Gmail: Gmail expects you to use one of two methods to relay mail through it (for very good reasons). The first is a TLS session, navigated by your average mail program such as postfix or qmail. The second is an SSL session.
+
+The problem with Hellcore: LambdaMOO doesn't navigate SSL connections, much less set one up mid stream for TLS.
+
+The solution (Hellcore Section):
+
+We will setup a tunnel in the Server Section - for now make sure you don't have any smtp servers running. If you do, you will need to use a different port.
+
+H1 @set $network.maildrop to "localhost"
+H2 @set $network.maildrop_port to 25
+
+H3 Run this command in your shell:
+perl -MMIME::Base64 -e 'print encode_base64("\000yourusername\@yourdomain.com\000not.my.real.password")'
+
+Replace the fake values with your own information, then save the string you receive after doing this.
+
+H4 @prop $network.smtp_auth_plain "the string you received from the step above goes here"
+H5 @edit $network:raw_sendmail
+Around line 26, after this line:
+data = {"HELO " + this.site, ("MAIL FROM:<" + this.postmaster) + ">", ("RCPT TO:<" + address) + ">", "DATA"};
+Add this line:
+data = {"HELO " + this.site, "AUTH PLAIN "+this.smtp_auth_plain, ("MAIL
+FROM:<" + this.postmaster) + ">", ("RCPT TO:<" + address) + ">", "DATA"};
+
+You keep the old line around in case you need to go back to sending via a local smtp server.
+Around line 47, after this line:
+expects = {"220", "250", "250", "250%|251", "354", "250", "221"};
+Add this line:
+expects = {"220", "250", "235", "250", "250%|251", "354", "250", "221"};
+
+This tells the moocode to expect a sequence of replies that includes authentication.
+
+More Solution (Server Section)
+
+There are two ways to meet gmail's requirements for security. The first is to connect via an SSL encrypted connection. The second is to negotiate an SSL connection after connecting via an unsecure session. These instructions accomplish the first.
+
+S1 Download, compile, and install stunnel manually or with your favorite package manager.
+
+vi /etc/stunnel/stunnel.conf
+
+Add the following lines to stunnel.conf:
+
+cert = /etc/stunnel/stunnel.pem
+socket = l:TCP_NODELAY=1
+socket = r:TCP_NODELAY=1
+client = yes
+
+[ssmtp]
+accept = 25
+connect = smtp.gmail.com:465
+If you changed the port in step H2, change the accept setting above to match.
+
+As root, execute stunnel, or read this to start it as a service. It will now accept all connections to port 25, encrypt them, and then send them to gmail's SMTP server.
+
+Almost Too Much Solution (Gmail)
+
+The last, or first thing to do is set everything up with Gmail.
+
+G1 Get signed up with Google Apps. Follow their directions to set up the appropriate MX records.
+
+G2 Add an SPF record as follows:
+@ IN TXT "v=spf1 ip4:AAA.BBB.CCC.DDD include:_spf.google.com ~all"
+
+Replace AAA.BBB.CCC.DDD with the IP address of your moo server. This tells google to allow SMTP connections directly from the moo.
+
+G3 (optional)
+Follow this guide to installing ssmtp and configuring it for gmail. ssmtp is a lightweight relay that will allow you to send mail through gmail from your server. This step is optional.
+
+The overall effect is that all your connections to smtp.gmail.com will be encrypted, removing the need to use the SMTP command STARTTLS. You will receive your email at your google apps page for your domain and send it through google's smtp servers in a secure way.
+
+There's no joy like nerd joy, eg the joy I experienced when I finally saw this output after a couple hours of fiddling:

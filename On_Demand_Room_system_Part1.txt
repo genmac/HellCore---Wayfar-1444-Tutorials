@@ -1,0 +1,56 @@
+
+On Demand Room System
+
+
+Problem:  You have an ASCII/ANSI based MOO that represents many rooms graphically, often.  Storing an object for each room consumes database space.  Database space is loaded into RAM at a cost of approx. (object's size in bytes) * 2.  On Wayfar, with 9 planets at 100x100, this would be nearly 10,000 objects per planet, almost 100,000 objects just to store blank space.
+
+Solution:  Only store the rooms that players or other objects are using.  Procedurally generate other rooms as required.  The savings are huge!  This is a rough guide to implementing such a system in MOO.  There will be a lot of variation based on your specific gameworld.
+
+Step 1:  Track spawned rooms and delete unused space.
+
+
+On Wayfar, an object named $ods (on demand spawn) is used to track the status of spawned rooms.  The active rooms are stored in a hash property called spawned_rooms.
+
+Each room must have a unique identifier for easy tracking.  I did this by creating a verb to concatenate a string together from the room's planet/location, and x, y, z co-ordinates.  Example:
+
+$ods:key_string(OBJ room)
+room = args[1];
+key = tostr(room.location, "-", room.x, "-", room.y,"-", room.z);
+return key;
+
+This would return a string along these lines: #4444-1-3--1 for a room located in object #4444 at 1, 3, -1.  This key will let you refer to the active rooms in $ods.spawned_rooms easily.
+
+Next we create a spawning verb for getting the rooms.  This part varies heavily according to how your rooms are setup, and how they are generated.  On Wayfar, we use a simple biome grid generated at planetary creation.  We always know the terrain type for a given X, Y location on a planet, and from that we can generate the appropriate resources and creatures.  This could be improved by proceduralizing all aspects of the room, so that even a despawned room would be re-created exactly from spawn to spawn.  Rough example:
+
+$ods:spawn_3d_room(OBJ location, INT x, INT y, INT z)
+{planet, x, y, z} = args;
+room_key = $ods:key_string(planet,x,y,z);
+"if the room already exists, we can just return it";
+if(room_key in keys($ods.spawned_rooms))
+  room = $ods.spawned_rooms[room_key];
+  if(gamevalid(room) && is_a(room,$room))
+    return room;
+  endif
+endif
+"otherwise, we should create a new room and return that";
+room = $room:populate();
+"on hellcore, that might be: room = $rpg:spawn($room)";
+room:set_point(x, y, z);
+room:moveto(planet);
+$ods.spawned_rooms[room_key] = room;
+
+Now we need to clean up unused rooms.  Example:
+
+$halfhourly:clean_ods
+rooms = $ou:leaves_suspended($room);
+for r in (rooms)
+yield;
+if(length(r.contents) < 1)
+"you could also add, as we have on Wayfar, a timer check to keep rooms persistent for some period of time";
+$rpg:junk(r);
+endif
+endfor
+
+Important note:  Once the elements above are implemented for your system, you still need to hook them into the actual movement actions for the player.  I setup some vector based verbs to figure out the rooms I need to be spawning based on the direction the player is moving (on a planet a player can move in any cardinal direction).
+
+This guide will hopefully be expanded as time goes on and I am able to write more examples.

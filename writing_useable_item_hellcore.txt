@@ -1,0 +1,24 @@
+How to write a useable item in Hellcore/Wayfar
+
+Requires basic knowledge of object creation - please reference the LambdaMOO programmer's guide.
+
+Step 1: create the item from an appropriate parent.
+
+Step 2: add a verb on the item for the player to kick off the action, it should look like this:
+
+@verb #itemid:use this none none
+1: if(this.location != player)
+2: return player:tell("You have to be holding this to use it!");
+3: else
+4: player:queue_action($actions.use, {this, #-1}, 1, "use "+this:name());
+5: endif
+
+Step 3: Write two new verbs on the item to handle the use action:
+
+do_use_start(OBJ who, OBJ on)
+do_use_finish(OBJ who, OBJ on)
+
+In our example we are just using the item, we aren't using it on anything.  This would need a more complex verb on the item in the form of:
+@verb #itemid use this on any
+
+And then you'd need to match the any against and item or person.
