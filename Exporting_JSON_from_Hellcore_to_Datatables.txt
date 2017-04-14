@@ -1,0 +1,52 @@
+Tutorial: Exporting JSON from Hellcore for use with jquery Datatables
+
+* Step 1: HTML or PHP template page
+
+ You will need jquery and datatables, which can be downloaded to your local folders. These will be included in our PHP pages later. Let's say we want to display all weapons, here is the template (HTML or PHP). You must replace $weapons_db with the actual OBJNUM of your weapons database:
+
+* Step 2: PHP ajax page
+
+ Query.php is a PHP file that queries the MOO server on port 8080. This is already setup by default in hellcore, but you need some modifications, firstly to $json_utils:_www
+$json_utils:"_www _html"       this none this
+     try
+       wargs = $su:explode(args[1], "/");
+       if (length(wargs) > 1)
+         item = toobj(wargs[2]);
+         if (gamevalid(item))
+           data = item:_json();
+           return {data};
+         endif
+       endif
+     except e (ANY)
+       $rpg:report_error(e);
+       return pass(@args);
+     endtry
+   return pass(@args);
+This changes the $json_utils:_www verb to accept an additional objects. Now let's make query.php: You must replace $json_utils in the code above with the actual object number of your JSON utils object. The code above means that we call json_utils, and we pass it an additional argument in the form of: yourdomain.com:8080/$json_utils/desired_objectnumber
+
+ * Step 3:
+Now - our desired_objectnumber must have _json verb, and it must return formatted json (not HTML). Note that the data is structed very specifically to comply with jquery datatables. Example:
+$weapons:_json
+w = $ou:fertile_branches($weapon);
+data = [];
+data = ["data" -> {}];
+for x in (w)
+  id = tostr(x)[2..$];
+  d = data["data"];
+  d = setadd(d, {id, x:name()});
+  data["data"] = d;
+  yield;
+endfor
+return $json_utils:encode(data);
+
+* Step 4: Getting JSON from our MOO server
+http://yourdomain.com:8080/query.php?objid=$weapons
+Will now return JSON output, something like this (partial): {"data":[["13477","generic melee weapon"],["14111","shock baton"], This has hopefully given you some hints for exporting this data. Modifying it, in MOO, on the fly, is also possible, with callbacks in datatables, but is more advanced.  If you get the basics working, you'll see something like an auto paginating page like this:
+
+
+
+
+*Step 5: Security
+Use iptables to ONLY allow requests to query.php, and yourdomain.com:8080 from your own domain. Google this!
+Questions? Comments?
+Post them below!

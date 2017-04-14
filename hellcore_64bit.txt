@@ -1,0 +1,26 @@
+General Tips for compiling Hellcore on 64 bit CentOS and other systems
+
+It is good practice to create a seperate user to run the moo.  You can name it moo, or your own name, or your mother's name.  You should add this user to the wheel group, so it has access to the sudo command.
+
+Move the hellcore.tar.gz to the home directory of your user.  Extract it into a subfolder, called moo or something.  Run this command:  tar -xvzf hellcore1104.tar.gz
+
+This will unzip the hellcore.  Change directory to the src directory.
+
+Now, setup your 64 bit system to actually be able to compile this beast:
+
+sudo yum install bison
+sudo yum -y install glibc.i686
+sudo yum install libstdc++.i686
+sudo yum install screen
+
+In the src directory run these commands:
+make clean
+make
+
+If you get no "exited with error" message at the end, success, you have won and can now retire.
+
+To start the moo:
+
+screen ./restart hellcore 7777
+CTRL+A+D
+Now you can return to view the screen with screen -r.  If you need to emergency shutdown the MOO, you can resume the screen and press CTRL+C - this will immediately dump everything to hellcore.db.panic!  Handy!

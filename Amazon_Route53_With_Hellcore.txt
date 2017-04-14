@@ -1,0 +1,17 @@
+Tips for running DNS service with Amazon route 53 (instead of running named on your box):
+
+Wayfar has originally run its own DNS servers.  I shifted this to Amazon, since I am moving the server and no longer want to run DNS services on the box itself.
+
+First step - the easy part:
+
+Import your zone file into Route 53 Amazon.  It costs about a dollar a month.
+
+Hard part: you have a second server that you'd like to modify and upgrade before fully moving to it as your primary server.
+
+Step 1: http://cobus.io/linux/2015/02/17/route-53-dns-update-script.html
+
+Get these scripts installed and configure not just the DNS (test.wayfar1444.com for instance), but also a user (updateip or dyndns) with the appropriate permissions.  Run the updateip script to make sure that your changes are reflected in the amazon dashboard.
+
+Once you've confirmed that the changes are actually taking effect, use crontab to add this to your server and keep amazon's DNS service updated with your actual IP by calling crontab -e:
+
+*/30 * * * * /home/wayfar/www/updateip.sh YOURHOSTEDZONEHERE your-iam-user your-domain.com
